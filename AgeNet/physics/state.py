@@ -1,6 +1,5 @@
 import numpy as np
-from ..environments.base import Environment
-from ..environments.simple import SimpleEnvironment
+from AgeNet.environments import Environment, SimpleEnvironment
 
 
 class PhysicalState:

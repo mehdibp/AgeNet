@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple, List
 
 from typing import TYPE_CHECKING
-if TYPE_CHECKING: from ..core.agent import Agent
+if TYPE_CHECKING: from AgeNet.core import Agent
 
 
 # Pure geometric neighbor discovery.
@@ -65,3 +65,16 @@ class NeighborFinder:
     # ---------------------------------------------------------------------------------------  
     def _distance_to(self, other: "Agent") -> float:
         return np.linalg.norm(self.agent.position - other.position)
+
+    # ---------------------------------------------------------------------------------------
+    def reconnect(self, incoming_neighbors: List[Tuple["Agent", float]], r: float) -> List[Tuple["Agent", float]]:
+        """
+        Cheaply re-filter an ALREADY-computed incoming_neighbors list against a (possibly
+        new) own radius r, WITHOUT rescanning all agents. Cost is O(degree), not O(N).
+ 
+        Use this after something changes self.agent.r locally (e.g. flip_radius) instead
+        of calling neighbors()/update_neighbors() again -- incoming_neighbors only depends
+        on OTHER agents' radii (unaffected by our own r), so it does not need to be
+        recomputed; only the two-way "connected" filter (distance <= our r) does.
+        """
+        return [ (other, distance) for other, distance in incoming_neighbors if distance <= r ]

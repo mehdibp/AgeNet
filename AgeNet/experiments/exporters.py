@@ -4,10 +4,9 @@ import pandas as pd
 import networkx as nx
 from typing import List, Any
 
-from ..core.agent import Agent
-from ..environments.base import Environment
-from ..analyses.metrics import NetworkMetrics
-from ..analyses.topology import NetworkTopology
+from AgeNet.core import Agent
+from AgeNet.environments import Environment
+from AgeNet.analyses import NetworkMetrics, NetworkTopology
 
 
 class ResultExporter:

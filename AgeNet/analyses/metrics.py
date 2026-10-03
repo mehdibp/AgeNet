@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 
 from typing import List
-from ..core.agent import Agent
+from AgeNet.core import Agent
 
 
 class NetworkMetrics:

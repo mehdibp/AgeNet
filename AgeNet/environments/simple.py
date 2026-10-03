@@ -3,10 +3,10 @@
 # ============================================================
 
 import numpy as np
-from typing import Tuple, List, Dict
+from typing import Tuple, List
 from matplotlib.transforms import Bbox
 
-from .base import Environment, Entity
+from base import Environment, Entity
 
 
 class SimpleEnvironment(Environment):

@@ -3,12 +3,12 @@
 # ============================================================
 
 import numpy as np
-from typing import Tuple, List, Dict
+from typing import Tuple
 
 import traci
 import sumolib
 
-from .base import Environment, Entity
+from base import Environment, Entity
 
 
 class SumoEnvironment(Environment):

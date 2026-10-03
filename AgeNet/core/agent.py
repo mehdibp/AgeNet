@@ -1,24 +1,10 @@
 import numpy as np
 from typing import List, Tuple
 
-# -------- physics --------
-from ..physics.mobility import MobilityModel
-from ..physics.state import PhysicalState
-
-# -------- communication --------
-from ..communication.radio import RadioModel
-from ..communication.channel import ChannelModel
-from ..communication.neighbor_finder import NeighborFinder
-from ..communication.request_policy import RadiusRequestPolicy
-
-# -------- learning --------
-from ..learning.brain import RLBrain
-from ..learning.state import StateExtractor
-from ..learning.hamiltonian import Hamiltonian
-from ..learning.radius_controller import RadiusController
-
-# -------- action policy --------
-from .action_policies import BasePolicy, FixedRadiusPolicy, KNNPolicy, MinDegreePolicy
+from AgeNet.physics import MobilityModel, PhysicalState
+from AgeNet.communication import RadioModel, ChannelModel, NeighborFinder, RadiusRequestPolicy
+from AgeNet.learning import RLBrain, StateExtractor, Hamiltonian, RadiusController
+from action_policies import BasePolicy, FixedRadiusPolicy, KNNPolicy, MinDegreePolicy
 
 
 
@@ -93,6 +79,18 @@ class Agent:
 
     def update_neighbors(self, all_agents: List["Agent"]):
         self.incoming_neighbors, self.neighbors = self.neighbor_finder.neighbors(all_agents)
+
+    def resync_after_flip(self, obstacles):
+        """
+        Cheaply refresh k/neighbors/energy after flip_radius() changes self.r, WITHOUT a
+        full O(N) neighbor rescan. Re-filters the already-computed incoming_neighbors list
+        (O(degree)) and recomputes k/rho from it via observe().
+ 
+        incoming_neighbors only depends on OTHER agents' radii, which flip does not touch,
+        so it's still valid; only the two-way "connected" filter needs updating.
+        """
+        self.neighbors = self.neighbor_finder.reconnect(self.incoming_neighbors, self.r)
+        return self.observe(obstacles)
 
     def decide_request(self):
         self.r = self.send_request.decide(self.incoming_neighbors)

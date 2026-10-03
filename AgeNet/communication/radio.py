@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Dict
 from typing import TYPE_CHECKING
-if TYPE_CHECKING: from ..core.agent import Agent
+if TYPE_CHECKING: from AgeNet.core import Agent
 
 
 # Models packet-level communication behavior of an entity.

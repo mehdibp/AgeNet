@@ -1,6 +1,6 @@
-from .base import BasePolicy
+from base import BasePolicy
 from typing import TYPE_CHECKING
-if TYPE_CHECKING: from ..agent import Agent
+if TYPE_CHECKING: from AgeNet.core import Agent
 
 
 class KNNPolicy(BasePolicy):

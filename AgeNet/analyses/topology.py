@@ -1,9 +1,9 @@
 import numpy as np
 
 from typing import List
-from ..core.agent import Agent
-from ..environments.base import Environment
-from ..communication.channel import ChannelModel
+from AgeNet.core import Agent
+from AgeNet.environments import Environment
+from AgeNet.communication import ChannelModel
 
 
 class NetworkTopology:

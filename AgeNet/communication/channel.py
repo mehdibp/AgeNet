@@ -1,7 +1,7 @@
-from ..environments.geometry import do_intersect
+from AgeNet.environments import do_intersect
 
 from typing import TYPE_CHECKING
-if TYPE_CHECKING: from ..core.agent import Agent
+if TYPE_CHECKING: from AgeNet.core import Agent
 
 
 class ChannelModel:

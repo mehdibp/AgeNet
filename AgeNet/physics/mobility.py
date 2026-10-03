@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
-from abc import ABC, abstractmethod
-from ..environments.base import Environment
+from abc import abstractmethod
+from AgeNet.environments import Environment
 
 
 class MobilityModel():

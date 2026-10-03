@@ -3,9 +3,9 @@ from celluloid import Camera
 import matplotlib.pyplot as plt
 
 from typing import List
-from .topology import NetworkTopology
-from ..core.agent import Agent
-from ..environments.base import Environment
+from topology import NetworkTopology
+from AgeNet.core import Agent
+from AgeNet.environments import Environment
 
 
 class NetworkVisualizer:

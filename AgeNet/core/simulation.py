@@ -1,6 +1,7 @@
+import numpy as np
 from typing import List
-from .agent import Agent
-from ..environments import *
+from agent import Agent
+from AgeNet.environments import *
 
 
 class AgentSimulator:
@@ -26,6 +27,7 @@ class AgentSimulator:
         # 2. Observe state
         self.agent.update_neighbors(all_agents)
         state = self.agent.observe(self.obstacles)
+        hamiltonian_before = self.agent.energy
         state = [s+1 for s in state]
 
         # 3. RL action and apply it (radius change)
@@ -34,19 +36,21 @@ class AgentSimulator:
 
         # 4. Observe next state
         self.agent.update_neighbors(all_agents)
-        next_state = self.agent.observe(self.obstacles)
-        next_state = [s+1 for s in next_state]
+        self.agent.observe(self.obstacles)
+        hamiltonian_after = self.agent.energy
 
         # 5. Reward
-        hamiltonian = self.agent.energy
-        reward = -(hamiltonian - self.hamiltonian_)
-        self.hamiltonian_ = hamiltonian
+        reward = -(hamiltonian_after - hamiltonian_before)
 
-        # 6. Remember transition
+        # 6. Metropolis-like flip
+        self.agent.flip_radius(-reward)
+        next_state = self.agent.resync_after_flip(self.obstacles)
+        next_state = [s+1 for s in next_state]
+
+        # 7. Remember transition
         self.agent.remember(state, action, reward, next_state)
 
-        # 7. filp - request - learning
-        self.agent.flip_radius(-reward)
+        # 8. request - learning
         if self.requesting: self.agent.decide_request()
         if self.training  : self.agent.learn(steps_per_train)
 
@@ -83,7 +87,14 @@ class AgentsSimulator(AgentSimulator):
 
     # ----------------------------------------------------------------------------------
     def run(self, agents: List[Agent], steps_per_train: int=10):
-        for simulator in self.agents_simulator:
+        # A fixed sweep order gives every early-index agent systematically "staler" info
+        # about later agents than vice versa. Shuffling removes that index-dependent bias
+        # while keeping the update fully local/async -- no shared state or global view is
+        # introduced, this only changes WHEN each agent's own local turn happens.
+        order = list(self.agents_simulator)
+        np.random.shuffle(order)
+ 
+        for simulator in order:
             self._EnvChange(simulator)
             simulator.step(agents, steps_per_train)
 

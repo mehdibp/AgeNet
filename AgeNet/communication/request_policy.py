@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Tuple, List
-from ..learning.hamiltonian import Hamiltonian
+from AgeNet.learning import Hamiltonian
 
 from typing import TYPE_CHECKING
-if TYPE_CHECKING: from ..core.agent import Agent
+if TYPE_CHECKING: from AgeNet.core import Agent
 
 
 class RadiusRequestPolicy:
@@ -21,10 +21,10 @@ class RadiusRequestPolicy:
             _, distance = incoming_neighbor
 
             if distance > radius:
-                delta_H = self.hamilton (
-                    k = (self.agent.k+1)**2 - self.agent.k**2,
-                    r = distance**2 - self.agent.r**2,
-                    neighbors = [incoming_neighbor])
+                delta_H = self.hamilton.delta(
+                    k        = self.agent.k,
+                    r        = self.agent.r,
+                    distance = distance)
                 
                 candidates.append((distance, delta_H))
 
