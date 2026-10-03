@@ -1,16 +1,24 @@
 import numpy as np
 import tensorflow as tf
 from collections import deque
+from abc import ABC, abstractmethod
 
 
 # -------------------------------------------------------------------------------------------
-class RLBrain:
+class BaseBrain(ABC):
     """
-    Reinforcement Learning brain of an agent.
-    Responsible ONLY for:
-      - action selection
-      - experience replay
-      - training the policy network
+    Common interface + shared machinery for every learning "brain" an Agent can plug in
+    (the DQN variants below for now; later anything else -- a different network
+    architecture, a rule-based brain, an LLM-backed brain such as Qwen, a multi-agent
+    method, etc). Each Agent owns its own brain instance; nothing here is shared across
+    agents -- adding a new method never requires any global/central state.
+ 
+    A new learning method only has to implement `_train()` (how one gradient step computes
+    its target_Q). Everything else -- model construction, replay buffer, greedy action
+    selection, training cadence, saving -- is shared here so the plumbing isn't
+    re-implemented every time. See brains/dqn.py, target_dqn.py, double_dqn.py for the
+    three methods currently registered, and brains/__init__.py for how to register a new
+    one without touching this file.
     """
     # ---------------------------------------------------------------------------------------
     def __init__(
@@ -20,7 +28,8 @@ class RLBrain:
         learning_rate: float = 1e-5,
         gamma: float = 0.98,
         batch_size: int = 20,
-        model_path: str | None = None
+        model_path: str | None = None,
+        replay_size: int = 50,
     ):
 
         self.state_dim  = state_dim
@@ -34,13 +43,19 @@ class RLBrain:
         self.loss_fn   = tf.keras.losses.MeanSquaredError()
 
 
-        self.replay_memory = deque(maxlen=50)   # A bag for 50 recently viewed (state, action, reward, next_state)
-        self.train_counter = 0                  # Just to set the train to run every few steps
-        self.last_loss     = tf.constant(0.0)   # Just for print and plot loss per step
+        self.replay_memory = deque(maxlen=replay_size)  # A bag for recently viewed (state, action, reward, next_state)
+        self.train_counter = 0                          # Just to set the train to run every few steps
+        self.last_loss     = tf.constant(0.0)           # Just for print and plot loss per step
 
 
     # ---------------------------------------------------------------------------------------
     def _build_model(self, model_path: str=None):
+        """
+        Shared architecture (3 -> 32 -> 32 -> action_dim, ELU hidden layers, bounded custom
+        output activation) -- unchanged from the original project on purpose. Override this
+        in a subclass if a method needs a different network (e.g. a dueling head).
+        """
+        
         tf.keras.backend.clear_session()
         custom_activation = {'_custom_activation': tf.keras.layers.Activation(self._custom_activation)}
         # tf.keras.utils.get_custom_objects().update({ '_custom_activation': _custom_activation })
@@ -74,37 +89,36 @@ class RLBrain:
         self._train()
 
     # ---------------------------------------------------------------------------------------
-    def _train(self):
-        indices = np.random.randint(len(self.replay_memory), size=self.batch_size)  # 32 random number between[0 - len(replay)]
-        batch   = [self.replay_memory[index] for index in indices]                  # number in replay_memory[indices]
-
-        states, actions, rewards, next_states = map( np.array, zip(*batch) )        # from replay_memory read these and save in
-
-        # Stabilize rewards (legacy logic preserved)
-        rewards = np.where( (-0.1 < rewards)&(rewards < 0.05), 0.0, np.round(rewards, 3) )
-
-        next_Q     = self.model({'input': next_states})     # 32 predict of 2 actions
-        max_next_Q = tf.reduce_max(next_Q, axis=1)          # choose higher probiblity of each actions (of each 32)
-        target_Q   = rewards + self.gamma * max_next_Q      # Equation 18-5. Q-Learning algorithm
-        target_Q   = tf.reshape(target_Q, (-1, 1))          # reshape to (32,1) beacuse of Q_values.shape
-        
-        mask = tf.one_hot(actions, self.action_dim)
-        with tf.GradientTape() as tape:
-            all_Q_values = self.model({'input': states})
-            Q_values = tf.reduce_sum(all_Q_values*mask, axis=1, keepdims=True)
-            self.last_loss = tf.reduce_mean(self.loss_fn(target_Q, Q_values))
-        grads = tape.gradient(self.last_loss, self.model.trainable_variables)
-
-
-        if not any(np.isnan(g.numpy()).any() for g in grads if g is not None):
-            self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-
-    # ---------------------------------------------------------------------------------------
     def save_model(self, output: str):
         self.model.save(output)
-
 
     # ---------------------------------------------------------------------------------------
     @staticmethod
     def _custom_activation(x):
         return 100 - tf.nn.elu(-tf.sqrt(tf.nn.softplus(x)) + 100)
+
+
+    # ---------------------------------------------------------------------------------------
+    @abstractmethod
+    def _train(self):
+        """ One gradient step. Each learning method defines its own target_Q computation. """
+        raise NotImplementedError
+
+    # ---------------------------------------------------------------------------------------
+    def _sample_batch(self):
+        """ Shared replay sampling + the legacy reward-stabilizing dead-zone/round. """
+        indices = np.random.randint(len(self.replay_memory), size=self.batch_size)  # 32 random number between[0 - len(replay)]
+        batch   = [self.replay_memory[index] for index in indices]                  # number in replay_memory[indices]
+        states, actions, rewards, next_states = map(np.array, zip(*batch))          # from replay_memory read these and save in
+
+        # Stabilize rewards (legacy logic preserved)
+        rewards = np.where( (-0.1 < rewards)&(rewards < 0.05), 0.0, np.round(rewards, 3) )
+
+        return states, actions, rewards, next_states
+ 
+    # ---------------------------------------------------------------------------------------
+    def _apply_gradients(self, tape: tf.GradientTape, loss: tf.Tensor):
+        grads = tape.gradient(loss, self.model.trainable_variables)
+        if not any(np.isnan(g.numpy()).any() for g in grads if g is not None):
+            self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+

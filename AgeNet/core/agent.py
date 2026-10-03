@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 from AgeNet.physics import MobilityModel, PhysicalState
 from AgeNet.communication import RadioModel, ChannelModel, NeighborFinder, RadiusRequestPolicy
-from AgeNet.learning import RLBrain, StateExtractor, Hamiltonian, RadiusController
+from AgeNet.learning import create_brain, StateExtractor, Hamiltonian, RadiusController
 from action_policies import BasePolicy, FixedRadiusPolicy, KNNPolicy, MinDegreePolicy
 
 
@@ -19,7 +19,10 @@ class Agent:
         physical_state: PhysicalState, 
         mobility: MobilityModel | None = None,
 
-        action_policy_parameters: List = ['RL']
+        action_policy_parameters: List = ['RL'],
+
+        brain_type: str = "dqn",
+        brain_kwargs: dict | None = None,
     ):
         
         self.id = agent_id
@@ -39,7 +42,7 @@ class Agent:
         self.send_request       = RadiusRequestPolicy(self, self.hamiltonian_model)
         self.radius_controller  = RadiusController(self)
         self.state              = StateExtractor(self, self.channel)
-        self.brain              = RLBrain(*brain_parameters)
+        self.brain              = create_brain(brain_type, *brain_parameters, **(brain_kwargs or {}))
 
         self.action_policy = self._build_policy(action_policy_parameters)
 
@@ -85,7 +88,7 @@ class Agent:
         Cheaply refresh k/neighbors/energy after flip_radius() changes self.r, WITHOUT a
         full O(N) neighbor rescan. Re-filters the already-computed incoming_neighbors list
         (O(degree)) and recomputes k/rho from it via observe().
- 
+
         incoming_neighbors only depends on OTHER agents' radii, which flip does not touch,
         so it's still valid; only the two-way "connected" filter needs updating.
         """

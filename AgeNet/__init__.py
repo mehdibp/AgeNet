@@ -11,7 +11,10 @@ from .communication.neighbor_finder import NeighborFinder
 from .communication.radio   import RadioModel
 from .communication.request_policy  import RadiusRequestPolicy
 
-from .learning.brain        import RLBrain
+from .learning.brains        import (
+    BaseBrain, DQNBrain, TargetDQNBrain, DoubleDQNBrain, RLBrain,
+    BRAIN_REGISTRY, register_brain, create_brain,
+)
 from .learning.hamiltonian  import Hamiltonian
 from .learning.radius_controller    import RadiusController
 from .learning.state        import StateExtractor
