@@ -41,7 +41,12 @@ VaNet/
 │   │
 │   │── learning/               # layer 4 – intelligence & control
 │   │   ├── __init__.py
-│   │   ├── brain.py
+│   │   ├── brains/
+|   │   │   ├── __init__.py
+|   │   │   ├── base_brain.py
+|   │   │   ├── dqn.py
+|   │   │   ├── target_dqn.py
+|   │   │   └── double_dqn.py
 │   │   ├── hamiltonian.py
 │   │   ├── radius_controller.py
 │   │   └── state.py
