@@ -10,6 +10,7 @@ class SimpleStatusApp : public DemoBaseApplLayer {
 
     protected:
         void handleSelfMsg(cMessage* msg) override;
+        void handlePositionUpdate(cObject* obj) override;
 };
 
 } // namespace veins
