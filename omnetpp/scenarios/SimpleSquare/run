@@ -1,0 +1,8 @@
+
+#!/bin/bash
+exec opp_run \
+    -l ../../../../omnet-workspace/veins-5.3.1/src/veins \
+    -l ../../out/clang-release/libVaNet_dbg.so \
+    -n ../../../../omnet-workspace/veins-5.3.1/src/veins:. \
+    "$@"
+    

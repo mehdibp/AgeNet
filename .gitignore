@@ -166,9 +166,26 @@ cython_debug/
 /.vscode
 
 
+# OMNeT++
+.cproject
+.oppbuildspec
+.project
+Makefile
+
+/omnetpp/scenarios/*/results/
+/omnetpp/.settings/
+/omnetpp/out/
+
+
+# Sumo
+/Sumo/*
+!/Sumo/Scenarios/
+/Sumo/Scenarios/*
+!/Sumo/Scenarios/SimpleSquare/
+
+
 
 # My folders!!!
-/py
 /Results/*
 !Results/Results Details.xlsx
 
@@ -176,9 +193,7 @@ Trained Models/*
 !Trained Models/Models Details.xlsx
 !Trained Models/TestModel_minHamiltonian.keras
 
-/Sumo/*
-!Sumo/SumoScenario/
-
 /tests
 /notebooks
-tests.ipynb
+test.*
+tests.*

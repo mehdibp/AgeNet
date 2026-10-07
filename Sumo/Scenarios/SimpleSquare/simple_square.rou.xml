@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-10-05T22:02:29.854544+03:30 by Eclipse SUMO netedit 1.27.1
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <!-- VTypes -->
+    <vType id="DEFAULT_CONTAINERTYPE" vClass="bus"/>
+    <!-- Vehicles, persons and containers (sorted by depart) -->
+    <trip id="veh_03" depart="0.00" from="E0" to="E3.299" via="E0.200 E2.100 -E1.199 -E3.99 E0.200 E2.100 -E1.199"/>
+    <trip id="veh_05" depart="0.00" from="-E2" to="E3.299" via="-E2.99 -E0.199 E3.100"/>
+    <flow id="container_01" type="DEFAULT_CONTAINERTYPE" begin="0.00" end="300.00" perHour="24.00" color="178,103,32" from="-E1" to="-E1.400" via="-E1.199"/>
+    <flow id="veh_01" begin="0.00" end="300.00" perHour="240.00" color="32,178,178" from="-E0" to="-E1.400" via="E2.100 -E1.199"/>
+    <flow id="veh_02" begin="0.00" end="300.00" perHour="180.00" color="32,178,178" from="E2" to="E2.299" via="E2.100"/>
+    <flow id="veh_04" begin="0.00" end="300.00" perHour="60.00" color="32,178,178" from="E3" to="E1.400" via="E3.100 E1.200"/>
+</routes>
