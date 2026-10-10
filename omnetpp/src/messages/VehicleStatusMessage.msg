@@ -10,6 +10,7 @@ packet VehicleStatusMessage extends BaseFrame1609_4 {
     double posX;
     double posY;
     double speed;
+    string roadId;
 
     simtime_t creationTime;
 }

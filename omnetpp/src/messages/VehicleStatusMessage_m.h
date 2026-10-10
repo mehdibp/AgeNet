@@ -40,6 +40,7 @@ namespace veins {
  *     double posX;
  *     double posY;
  *     double speed;
+ *     string roadId;
  * 
  *     simtime_t creationTime;
  * }
@@ -54,6 +55,7 @@ class VehicleStatusMessage : public ::veins::BaseFrame1609_4
     double posX = 0;
     double posY = 0;
     double speed = 0;
+    ::omnetpp::opp_string roadId;
     ::omnetpp::simtime_t creationTime = SIMTIME_ZERO;
 
   private:
@@ -88,6 +90,9 @@ class VehicleStatusMessage : public ::veins::BaseFrame1609_4
 
     virtual double getSpeed() const;
     virtual void setSpeed(double speed);
+
+    virtual const char * getRoadId() const;
+    virtual void setRoadId(const char * roadId);
 
     virtual ::omnetpp::simtime_t getCreationTime() const;
     virtual void setCreationTime(::omnetpp::simtime_t creationTime);

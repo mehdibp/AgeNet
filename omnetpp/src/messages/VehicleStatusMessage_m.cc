@@ -183,6 +183,7 @@ void VehicleStatusMessage::copy(const VehicleStatusMessage& other)
     this->posX = other.posX;
     this->posY = other.posY;
     this->speed = other.speed;
+    this->roadId = other.roadId;
     this->creationTime = other.creationTime;
 }
 
@@ -195,6 +196,7 @@ void VehicleStatusMessage::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->posX);
     doParsimPacking(b,this->posY);
     doParsimPacking(b,this->speed);
+    doParsimPacking(b,this->roadId);
     doParsimPacking(b,this->creationTime);
 }
 
@@ -207,6 +209,7 @@ void VehicleStatusMessage::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->posX);
     doParsimUnpacking(b,this->posY);
     doParsimUnpacking(b,this->speed);
+    doParsimUnpacking(b,this->roadId);
     doParsimUnpacking(b,this->creationTime);
 }
 
@@ -270,6 +273,16 @@ void VehicleStatusMessage::setSpeed(double speed)
     this->speed = speed;
 }
 
+const char * VehicleStatusMessage::getRoadId() const
+{
+    return this->roadId.c_str();
+}
+
+void VehicleStatusMessage::setRoadId(const char * roadId)
+{
+    this->roadId = roadId;
+}
+
 ::omnetpp::simtime_t VehicleStatusMessage::getCreationTime() const
 {
     return this->creationTime;
@@ -291,6 +304,7 @@ class VehicleStatusMessageDescriptor : public omnetpp::cClassDescriptor
         FIELD_posX,
         FIELD_posY,
         FIELD_speed,
+        FIELD_roadId,
         FIELD_creationTime,
     };
   public:
@@ -358,7 +372,7 @@ const char *VehicleStatusMessageDescriptor::getProperty(const char *propertyName
 int VehicleStatusMessageDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
-    return base ? 7+base->getFieldCount() : 7;
+    return base ? 8+base->getFieldCount() : 8;
 }
 
 unsigned int VehicleStatusMessageDescriptor::getFieldTypeFlags(int field) const
@@ -376,9 +390,10 @@ unsigned int VehicleStatusMessageDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,    // FIELD_posX
         FD_ISEDITABLE,    // FIELD_posY
         FD_ISEDITABLE,    // FIELD_speed
+        FD_ISEDITABLE,    // FIELD_roadId
         FD_ISEDITABLE,    // FIELD_creationTime
     };
-    return (field >= 0 && field < 7) ? fieldTypeFlags[field] : 0;
+    return (field >= 0 && field < 8) ? fieldTypeFlags[field] : 0;
 }
 
 const char *VehicleStatusMessageDescriptor::getFieldName(int field) const
@@ -396,9 +411,10 @@ const char *VehicleStatusMessageDescriptor::getFieldName(int field) const
         "posX",
         "posY",
         "speed",
+        "roadId",
         "creationTime",
     };
-    return (field >= 0 && field < 7) ? fieldNames[field] : nullptr;
+    return (field >= 0 && field < 8) ? fieldNames[field] : nullptr;
 }
 
 int VehicleStatusMessageDescriptor::findField(const char *fieldName) const
@@ -411,7 +427,8 @@ int VehicleStatusMessageDescriptor::findField(const char *fieldName) const
     if (strcmp(fieldName, "posX") == 0) return baseIndex + 3;
     if (strcmp(fieldName, "posY") == 0) return baseIndex + 4;
     if (strcmp(fieldName, "speed") == 0) return baseIndex + 5;
-    if (strcmp(fieldName, "creationTime") == 0) return baseIndex + 6;
+    if (strcmp(fieldName, "roadId") == 0) return baseIndex + 6;
+    if (strcmp(fieldName, "creationTime") == 0) return baseIndex + 7;
     return base ? base->findField(fieldName) : -1;
 }
 
@@ -430,9 +447,10 @@ const char *VehicleStatusMessageDescriptor::getFieldTypeString(int field) const
         "double",    // FIELD_posX
         "double",    // FIELD_posY
         "double",    // FIELD_speed
+        "string",    // FIELD_roadId
         "omnetpp::simtime_t",    // FIELD_creationTime
     };
-    return (field >= 0 && field < 7) ? fieldTypeStrings[field] : nullptr;
+    return (field >= 0 && field < 8) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **VehicleStatusMessageDescriptor::getFieldPropertyNames(int field) const
@@ -521,6 +539,7 @@ std::string VehicleStatusMessageDescriptor::getFieldValueAsString(omnetpp::any_p
         case FIELD_posX: return double2string(pp->getPosX());
         case FIELD_posY: return double2string(pp->getPosY());
         case FIELD_speed: return double2string(pp->getSpeed());
+        case FIELD_roadId: return oppstring2string(pp->getRoadId());
         case FIELD_creationTime: return simtime2string(pp->getCreationTime());
         default: return "";
     }
@@ -544,6 +563,7 @@ void VehicleStatusMessageDescriptor::setFieldValueAsString(omnetpp::any_ptr obje
         case FIELD_posX: pp->setPosX(string2double(value)); break;
         case FIELD_posY: pp->setPosY(string2double(value)); break;
         case FIELD_speed: pp->setSpeed(string2double(value)); break;
+        case FIELD_roadId: pp->setRoadId((value)); break;
         case FIELD_creationTime: pp->setCreationTime(string2simtime(value)); break;
         default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'VehicleStatusMessage'", field);
     }
@@ -565,6 +585,7 @@ omnetpp::cValue VehicleStatusMessageDescriptor::getFieldValue(omnetpp::any_ptr o
         case FIELD_posX: return pp->getPosX();
         case FIELD_posY: return pp->getPosY();
         case FIELD_speed: return pp->getSpeed();
+        case FIELD_roadId: return pp->getRoadId();
         case FIELD_creationTime: return pp->getCreationTime().dbl();
         default: throw omnetpp::cRuntimeError("Cannot return field %d of class 'VehicleStatusMessage' as cValue -- field index out of range?", field);
     }
@@ -588,6 +609,7 @@ void VehicleStatusMessageDescriptor::setFieldValue(omnetpp::any_ptr object, int 
         case FIELD_posX: pp->setPosX(value.doubleValue()); break;
         case FIELD_posY: pp->setPosY(value.doubleValue()); break;
         case FIELD_speed: pp->setSpeed(value.doubleValue()); break;
+        case FIELD_roadId: pp->setRoadId(value.stringValue()); break;
         case FIELD_creationTime: pp->setCreationTime(value.doubleValue()); break;
         default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'VehicleStatusMessage'", field);
     }

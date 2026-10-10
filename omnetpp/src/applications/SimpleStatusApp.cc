@@ -3,6 +3,10 @@
 #include "messages/VehicleStatusMessage_m.h"
 #include "SimpleStatusApp.h"
 
+#include <iomanip>
+#include <cmath>
+
+
 using namespace veins;
 using namespace omnetpp;
 
@@ -15,6 +19,8 @@ void SimpleStatusApp::initialize(int stage) {
     DemoBaseApplLayer::initialize(stage);
 
     if (stage == 0) {
+        openNeighborCSV();
+        
         scheduleAt(simTime() + SimTime(1, SIMTIME_S), new cMessage("statusTimer"));
         scheduleAt(simTime() + SimTime(2, SIMTIME_S) + uniform(0, 1), new cMessage("sendTimer"));
         scheduleAt(simTime() + SimTime(2, SIMTIME_S) + uniform(0, 1), new cMessage("neighborTimer"));
@@ -23,30 +29,57 @@ void SimpleStatusApp::initialize(int stage) {
 
 // Finish the application --------------------------------------------------------------------
 void SimpleStatusApp::finish() {
+    if (neighborCsv.is_open()) neighborCsv.close();
     DemoBaseApplLayer::finish();
 }
 
 
+// -------------------------------------------------------------------------------------------
+// Read the current vehicle state ------------------------------------------------------------
+SimpleStatusApp::VehicleState
+SimpleStatusApp::_getVehicleState() {
+    TraCIMobility* mobility = TraCIMobilityAccess().get(findHost());
+    VehicleState state;
+
+    state.vehicleId = findHost()->getFullName();
+    state.position  = mobility->getPositionAt(simTime());
+    state.speed     = mobility->getSpeed();
+    state.roadId    = mobility->getRoadId();
+
+    return state;
+}
+
+// Calculate Euclidean distance between two positions ----------------------------------------
+double SimpleStatusApp::_getDistance(double x1, double y1, double x2, double y2) const {
+    const double dx = x2 - x1;
+    const double dy = y2 - y1;
+
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+// Print a vehicle's current state -----------------------------------------------------------
+void SimpleStatusApp::_printLog(const std::string& prefix, const std::string& details, const VehicleState& state) {
+    EV_INFO
+        << prefix << "--"
+        << " vehicle: " << state.vehicleId
+        << " | time: "  << simTime()
+        << " | position: (" << state.position.x << ", " << state.position.y << ")"
+        << " | speed: " << state.speed << " m/s"
+        << " | road: "  << state.roadId;
+
+    if (!details.empty()) EV_INFO << " | " << details;
+
+    EV_INFO << endl;
+}
+
+
+// -------------------------------------------------------------------------------------------
 // Handle self-messages ----------------------------------------------------------------------
 void SimpleStatusApp::handleSelfMsg(cMessage* msg) {
 
     if (msg->isName("statusTimer")) {
-        TraCIMobility* mobility = TraCIMobilityAccess().get(findHost());    // Get the mobility module of this vehicle.
-
-        // Read the current vehicle state.
-        Coord position      = mobility->getPositionAt(simTime());
-        double speed        = mobility->getSpeed();
-        std::string roadId  = mobility->getRoadId();
-
-        // Print the vehicle state.
-        // EV_INFO
-        //     << "Vehicle: "  << findHost()->getFullName()
-        //     << " | time: "  << simTime()
-        //     << " | position: (" << position.x << ", " << position.y << ")"
-        //     << " | speed: " << speed << " m/s"
-        //     << " | road: "  << roadId
-        //     << endl;
-
+        // VehicleState state = getVehicleState();
+        // printLog("VEHICLE", "", state);
         // scheduleAt(simTime() + SimTime(1, SIMTIME_S), msg);
     }
     else if (msg->isName("sendTimer")) {
@@ -55,6 +88,8 @@ void SimpleStatusApp::handleSelfMsg(cMessage* msg) {
     }
     else if (msg->isName("neighborTimer")) {
         updateNeighbors();
+        printNeighborTable();
+        saveNeighborsToCSV();
         scheduleAt(simTime() + SimTime(1, SIMTIME_S), msg);
     }
     else { DemoBaseApplLayer::handleSelfMsg(msg); }
@@ -70,23 +105,20 @@ void SimpleStatusApp::onWSM(BaseFrame1609_4* wsm) {
     // Ignore our own messages.
     if (senderId == myId) return;
 
-    Neighbor neighbor;
+    VehicleState neighbor;
 
-    neighbor.senderId   = senderId;
-    neighbor.vehicleId  = message->getVehicleId();
-    neighbor.posX       = message->getPosX();
-    neighbor.posY       = message->getPosY();
-    neighbor.speed      = message->getSpeed();
-    neighbor.lastSeen   = simTime();
+    neighbor.vehicleId = message->getVehicleId();
+    neighbor.position  = Coord(message->getPosX(), message->getPosY());
+    neighbor.speed     = message->getSpeed();
+    neighbor.roadId    = message->getRoadId();
+    neighbor.lastSeen  = simTime();
 
     neighbors[senderId] = neighbor;
 
     EV_INFO
-        << "[RX] Vehicle: "  << findHost()->getFullName()
-        << " received from " << neighbor.vehicleId
-        << " | position: ("  << neighbor.posX << ", " << neighbor.posY << ")"
-        << " | speed: "      << neighbor.speed
-        << " | neighbors: "  << neighbors.size()
+        << "[RX] Vehicle: "    << findHost()->getFullName()
+        << " | received from " << neighbor.vehicleId
+        << " | neighbors: "    << neighbors.size()
         << endl;
 }
 
@@ -94,52 +126,35 @@ void SimpleStatusApp::onWSM(BaseFrame1609_4* wsm) {
 void SimpleStatusApp::handlePositionUpdate(cObject* obj) {
     DemoBaseApplLayer::handlePositionUpdate(obj);
 
-    TraCIMobility* mobility = TraCIMobilityAccess().get(findHost());
-
-    Coord position = mobility->getPositionAt(simTime());
-    double speed        = mobility->getSpeed();
-    std::string roadId  = mobility->getRoadId();
-
-    // EV_INFO
-    //     << "[MOVEMENT EVENT] "
-    //     << "vehicle=" << findHost()->getFullName()
-    //     << " time=" << simTime()
-    //     << " position=(" << position.x << ", " << position.y << ")"
-    //     << " speed=" << speed << " m/s"
-    //     << " road=" << roadId
-    //     << endl;
+    // VehicleState state = getVehicleState();
+    // printLog("MOVEMENT", "", state);
 }
 
 
 // -------------------------------------------------------------------------------------------
+// Send our vehicle status -------------------------------------------------------------------
 void SimpleStatusApp::sendVehicleStatus() {
-    TraCIMobility* mobility = TraCIMobilityAccess().get(findHost());
-    Coord position = mobility->getPositionAt(simTime());
+    VehicleState state = getVehicleState();
 
     VehicleStatusMessage* message = new VehicleStatusMessage();
     populateWSM(message);
 
     message->setSenderId(myId);
-    message->setVehicleId(findHost()->getFullName());
-    message->setPosX(position.x);
-    message->setPosY(position.y);
-    message->setSpeed(mobility->getSpeed());
+    message->setVehicleId(state.vehicleId.c_str());
+    message->setPosX(state.position.x);
+    message->setPosY(state.position.y);
+    message->setSpeed(state.speed);
+    message->setRoadId(state.roadId.c_str());
     message->setCreationTime(simTime());
     message->setSerial(messageCounter++);
 
     message->setRecipientAddress(LAddress::L2BROADCAST());      // Broadcast
 
-    EV_INFO
-        << "[TX] Vehicle: " << findHost()->getFullName()
-        << " | serial: " << message->getSerial()
-        << " | position: (" << position.x << ", " << position.y << ")"
-        << " | speed: " << mobility->getSpeed()
-        << endl;
-
+    printLog("TX", "serial: "+std::to_string(message->getSerial()), state);
     sendDown(message);
 }
 
-// -------------------------------------------------------------------------------------------
+// Remove neighbors that have timed out ------------------------------------------------------
 void SimpleStatusApp::updateNeighbors() {
     for (auto it=neighbors.begin(); it!=neighbors.end();) {
         if (simTime() - it->second.lastSeen > neighborTimeout) {
@@ -156,4 +171,84 @@ void SimpleStatusApp::updateNeighbors() {
         }
     }
 }
+
+// Print current neighbor table --------------------------------------------------------------
+void SimpleStatusApp::printNeighborTable() {
+    const VehicleState state = getVehicleState();
+
+    EV_INFO
+        << "[NEIGHBORS] "
+        << "vehicle: "  << state.vehicleId
+        << " | time: "  << simTime()
+        << " | count: " << neighbors.size()
+        << endl;
+
+    if (neighbors.empty()) {
+        EV_INFO << "    (no neighbors)" << endl;
+        return;
+    }
+
+    // Print every neighbor
+    for (const auto& [id, neighbor] : neighbors) {
+        const double distance = getDistance(state.position.x, state.position.y, neighbor.position.x, neighbor.position.y);
+
+        simtime_t age = simTime() - neighbor.lastSeen;
+
+        printLog("    ", 
+                 "id: " + std::to_string(id) + 
+                 " | distance: " + std::to_string(distance) + " m" + 
+                 " | age: " + std::to_string(age.dbl()) + " s", 
+                 neighbor);
+    }
+
+}
+
+// Open a separate CSV file for this vehicle -------------------------------------------------
+void SimpleStatusApp::openNeighborCSV() {
+    std::string vehicleName = findHost()->getFullName();
+
+    // Convert node[11] to node_11 for a convenient filename.
+    for (char& c : vehicleName) {
+        if (c == '[' || c == ']')
+            c = '_';
+    }
+
+    std::string filename = "results/neighbors_" + vehicleName + ".csv";
+
+    neighborCsv.open(filename, std::ios::out);
+
+    if (!neighborCsv.is_open()) {
+        throw cRuntimeError("Cannot open neighbor CSV file: %s", filename.c_str());
+    }
+
+    neighborCsv << "time,neighbor_vehicle_id,neighbor_id,neighbor_x,neighbor_y,neighbor_speed,distance,last_seen,age\n";
+    neighborCsv << std::setprecision(12);
+}
+
+// Write the current neighbor table as a CSV snapshot ----------------------------------------
+void SimpleStatusApp::saveNeighborsToCSV() {
+    if (!neighborCsv.is_open()) return;
+
+    const VehicleState state = getVehicleState();
+
+    for (const auto& [id, neighbor] : neighbors) {
+        const double distance = getDistance(state.position.x, state.position.y, neighbor.position.x, neighbor.position.y);
+
+        omnetpp::simtime_t age = simTime() - neighbor.lastSeen;
+
+        neighborCsv
+            << simTime() << ","
+            << neighbor.vehicleId << ","
+            << id << ","
+            << neighbor.position.x << ","
+            << neighbor.position.y << ","
+            << neighbor.speed << ","
+            << distance << ","
+            << neighbor.lastSeen << ","
+            << age << "\n";
+    }
+
+    neighborCsv.flush();
+}
+
 

@@ -4,30 +4,37 @@
 
 #include <map>
 #include <string>
+#include <fstream>
 
 
 namespace veins {
 
 class SimpleStatusApp : public DemoBaseApplLayer {
     private:
-        int messageCounter = 0;
-
-        struct Neighbor {
-            int senderId;
-            // int serial;
+        struct VehicleState {
             std::string vehicleId;
-            double posX;
-            double posY;
+            Coord position;
             double speed;
+            std::string roadId;
             simtime_t lastSeen; 
         };
         
-        std::map<int, Neighbor> neighbors;
+        VehicleState _getVehicleState();                        // Read the current vehicle state from Veins / SUMO
+        double _getDistance(double x1, double y1, double x2, double y2) const;      // Distance between two positions
+        void _printLog(const std::string& prefix, const std::string& details, const VehicleState& state);   // Log
+
+        int messageCounter = 0;
+        std::map<int, VehicleState> neighbors;
         simtime_t neighborTimeout = SimTime(3, SIMTIME_S);
 
         void sendVehicleStatus();
         void updateNeighbors();
+        void printNeighborTable();
+
+        std::ofstream neighborCsv;
         void saveNeighborsToCSV();
+        void openNeighborCSV();
+
         
     protected:
         void handleSelfMsg(cMessage* msg) override;
@@ -42,3 +49,4 @@ class SimpleStatusApp : public DemoBaseApplLayer {
 };
 
 } // namespace veins
+
