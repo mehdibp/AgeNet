@@ -3,11 +3,14 @@
 #include "veins/modules/mobility/traci/TraCIMobility.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <fstream>
 
 
 namespace veins {
+
+class PythonBridge;
 
 class SimpleStatusApp : public DemoBaseApplLayer {
     private:
@@ -19,9 +22,8 @@ class SimpleStatusApp : public DemoBaseApplLayer {
             simtime_t lastSeen; 
         };
         
-        VehicleState _getVehicleState();                        // Read the current vehicle state from Veins / SUMO
-        double _getDistance(double x1, double y1, double x2, double y2) const;      // Distance between two positions
-        void _printLog(const std::string& prefix, const std::string& details, const VehicleState& state);   // Log
+        VehicleState getVehicleState();                         // Read the current vehicle state from Veins / SUMO
+        void printLog(const std::string& prefix, const std::string& details, const VehicleState& state);    // Log
 
         int messageCounter = 0;
         std::map<int, VehicleState> neighbors;
@@ -35,6 +37,13 @@ class SimpleStatusApp : public DemoBaseApplLayer {
         void saveNeighborsToCSV();
         void openNeighborCSV();
 
+
+        // PythonBridge owns all TCP socket operations. 
+        // SimpleStatusApp owns the simulation scheduling and prepares the vehicle observation.
+        std::unique_ptr<PythonBridge> pythonBridge;
+        cMessage* pythonTimer = nullptr;
+        void exchangeWithPython();
+
         
     protected:
         void handleSelfMsg(cMessage* msg) override;
@@ -43,6 +52,7 @@ class SimpleStatusApp : public DemoBaseApplLayer {
         void onWSM(BaseFrame1609_4* wsm) override;
 
     public:
+        ~SimpleStatusApp() override;
         void initialize(int stage) override;
         void finish() override;
 
