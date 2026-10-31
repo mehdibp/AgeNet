@@ -4,7 +4,7 @@ from typing import List, Tuple
 from AgeNet.physics import MobilityModel, PhysicalState
 from AgeNet.communication import RadioModel, ChannelModel, NeighborFinder, RadiusRequestPolicy
 from AgeNet.learning import create_brain, StateExtractor, Hamiltonian, RadiusController
-from action_policies import BasePolicy, FixedRadiusPolicy, KNNPolicy, MinDegreePolicy
+from .action_policies import BasePolicy, FixedRadiusPolicy, KNNPolicy, MinDegreePolicy
 
 
 

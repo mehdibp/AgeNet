@@ -1,4 +1,10 @@
 #pragma once
+
+#include <cstddef>
+#include <string>
+#include <map>
+#include "applications/VehicleState.h"
+
 // ===========================================================================================
 // Human-readable EV_INFO output (what you see in Qtenv / Cmdenv). NOT needed for the simulation
 // to work. To remove all of it from the build, compile with  -DAGENET_QTENV_LOG=0  and every
@@ -8,14 +14,13 @@
 #define AGENET_QTENV_LOG 1
 #endif
 
-#include <cstddef>
-#include <string>
-#include "applications/VehicleState.h"
-
 namespace veins {
 namespace console_log {
 
 #if AGENET_QTENV_LOG
+
+    // Runtime control
+    void setEnabled(bool enabled);
 
     void status       (const VehicleState& self, const std::string& prefix);
     void transmit     (const VehicleState& self, int serial);
@@ -25,6 +30,9 @@ namespace console_log {
     void pythonAction (const VehicleState& self, const double txPowerMw, std::size_t neighborCount);
 
 #else
+
+    // Compile-time disabled
+    inline void setEnabled(bool) {}
 
     inline void status       (const VehicleState&, const std::string&) {}
     inline void transmit     (const VehicleState&, int) {}

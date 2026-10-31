@@ -197,3 +197,4 @@ Trained Models/*
 /notebooks
 test.*
 tests.*
+omnetpp/src/bridge/vanet_server.ipynb

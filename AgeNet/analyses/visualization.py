@@ -3,7 +3,7 @@ from celluloid import Camera
 import matplotlib.pyplot as plt
 
 from typing import List
-from topology import NetworkTopology
+from .topology import NetworkTopology
 from AgeNet.core import Agent
 from AgeNet.environments import Environment
 

@@ -5,10 +5,14 @@
 import numpy as np
 from typing import Tuple
 
-import traci
-import sumolib
+try:
+    import traci
+    import sumolib
 
-from base import Environment, Entity
+except ImportError:
+    print("SUMO dependencies (traci, sumolib) are not installed. SUMO-related features will be unavailable.")
+
+from .base import Environment, Entity
 
 
 class SumoEnvironment(Environment):

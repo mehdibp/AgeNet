@@ -1,5 +1,5 @@
 import numpy as np
-from base import BasePolicy
+from .base import BasePolicy
 from typing import TYPE_CHECKING
 if TYPE_CHECKING: from AgeNet.core import Agent
 

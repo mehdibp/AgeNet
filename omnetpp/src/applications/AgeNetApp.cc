@@ -32,6 +32,7 @@ void AgeNetApp::initialize(int stage) {
     DemoBaseApplLayer::initialize(stage);
 
     if (stage == 0) {
+        console_log::setEnabled(par("enableConsoleLog").boolValue());
         csvLogger.open(findHost()->getFullName());
         
         scheduleAt(simTime() + SimTime(FirstEventDelay, SIMTIME_S) + uniform(0, 1), new cMessage("statusTimer"));

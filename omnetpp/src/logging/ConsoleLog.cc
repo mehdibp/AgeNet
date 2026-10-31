@@ -9,6 +9,9 @@ using namespace omnetpp;
 namespace veins {
 namespace console_log {
 
+static bool loggingEnabled = true;
+void setEnabled(bool enabled) { loggingEnabled = enabled; }
+
 
 namespace {
     // One vehicle's state on a single line.
@@ -28,14 +31,20 @@ namespace {
 } // namespace
 
 void status(const VehicleState& self, const std::string& prefix) {
+    if (!loggingEnabled) return;
+    
     printLog(prefix, "", self);
 }
 
 void transmit(const VehicleState& self, int serial) {
+    if (!loggingEnabled) return;
+
     printLog("TX", "serial: " + std::to_string(serial), self);
 }
 
 void received(const std::string& host, const std::string& fromVehicle, std::size_t neighborCount) {
+    if (!loggingEnabled) return;
+
     EV_INFO
         << "[RX] Vehicle: "    << host
         << " | received from " << fromVehicle
@@ -44,6 +53,8 @@ void received(const std::string& host, const std::string& fromVehicle, std::size
 }
 
 void neighborLost(const std::string& host, const VehicleState& lost) {
+    if (!loggingEnabled) return;
+
     EV_INFO
         << "[NEIGHBOR LOST] " << host
         << " lost " << lost.vehicleId
@@ -52,6 +63,8 @@ void neighborLost(const std::string& host, const VehicleState& lost) {
 }
 
 void neighborTable(const VehicleState& self, const std::map<int, VehicleState>& neighbors) {
+    if (!loggingEnabled) return;
+
     EV_INFO
         << "[NEIGHBORS] "
         << "vehicle: "  << self.vehicleId
@@ -77,6 +90,8 @@ void neighborTable(const VehicleState& self, const std::map<int, VehicleState>& 
 }
 
 void pythonAction(const VehicleState& self, const double txPowerMw, std::size_t neighborCount) {
+    // if (!loggingEnabled) return;
+
     EV_INFO
         << "[PYTHON ACTION] vehicle=" << self.vehicleId
         << " | time=" << simTime()
