@@ -22,15 +22,14 @@ VaNet/
 │   │
 │   ├── environment/            # layer 1 – world & map
 │   │   ├── __init__.py
+│   │   ├── physics/            # layer 2 – physical state & motion
+│   │   │   ├── __init__.py
+│   │   │   └── mobility.py
 │   │   ├── base.py
 │   │   ├── simple.py
 │   │   ├── sumo.py
 │   │   └── geometry.py
 │   │
-│   ├── physics/                # layer 2 – physical state & motion
-│   │   ├── __init__.py
-│   │   ├── mobility.py
-│   │   └── state.py
 │   │
 │   ├── communication/          # layer 3 – network & interaction
 │   │   ├── __init__.py
@@ -84,9 +83,13 @@ VaNet/
 │       └── simulation.launchd.xml
 │
 ├── omnetpp/                    # Network Simulation (C++/NED)
+│   ├── scenarios/              # Every different scenario in omnet
 │   ├── src/                    # Custom RLNode & NetworkServer logic
-│   ├── ned/                    # Network topology definitions
-│   └── omnetpp.ini             # Physical layer & MAC parameters
+│   │   ├── applications/
+│   │   ├── bridge/
+│   │   ├── logging/
+│   │   └── massages/
+│   └── tools                   # Auxiliary tools
 │
 ├── Results/                    # Simulation logs & Excel exports
 ├── Trained Models/             # Pre-trained .keras models

@@ -3,8 +3,7 @@ from .environments.simple   import SimpleEnvironment
 from .environments.sumo     import SumoEnvironment
 from .environments.geometry import do_intersect
 
-from .physics.mobility      import MobilityModel, NonMarkovian
-from .physics.state         import PhysicalState
+from .environments.physics.mobility import MobilityModel, NonMarkovian
 
 from .communication.channel import ChannelModel
 from .communication.neighbor_finder import NeighborFinder

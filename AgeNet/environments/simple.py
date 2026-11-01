@@ -3,10 +3,11 @@
 # ============================================================
 
 import numpy as np
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from matplotlib.transforms import Bbox
 
 from .base import Environment, Entity
+from .physics import MobilityModel
 
 
 class SimpleEnvironment(Environment):
@@ -21,45 +22,44 @@ class SimpleEnvironment(Environment):
         elif buildings_type == "regular": self._regular_buildings(num_streets)
         else: raise ValueError( "buildings_type is invalid. Allowed values: 'random' or 'regular'." )
 
-
         self.physics = SimplePhysics(self.L, self._buildings)        # attach physics module
+        self.mobilities: Dict[str, MobilityModel] = {}
 
-    # lifecycle -----------------------------------------------------------------------------
-    def start(self): 
-        self._time = 0.0
 
-    def close(self): 
-        self._entities.clear()
+    def step(self):
+        for entity_id, entity in self._entities.items():
+            position, speed, direction = self.mobilities[entity_id].move(entity.position)
+            self.update_entity(entity_id, position, speed, direction, roadId=None)
 
-    def reset(self):
-        self.close()
-        self.start()
-
-    def step(self) : 
         self._time += 1
 
 
     # entity management ---------------------------------------------------------------------
-    def add_entity(self, entity_id: str, position: np.ndarray, speed: float, direction: float, edge: str | None):
+    def add_entity(self, entity_id: str, mobility: MobilityModel, roadId: str | None=None):
         if entity_id in self._entities:
             raise ValueError(f"Entity '{entity_id}' already exists.")
+        if mobility is None: 
+            raise ValueError( "Mobility/Movement is not defined. (Maybe using the sumo environment)" )
+
+        position = self.init_position()
+        self.mobilities[entity_id] = mobility
         
         self._entities[entity_id] = Entity(
             position=position.astype(float),
-            speed=speed,
-            direction=direction,
-            edge=edge
+            speed=mobility.speed,
+            direction=mobility.radian,
+            roadId=roadId
         )
 
     def remove_entity(self, entity_id: str):
         self._entities.pop(entity_id, None)
 
-    def update_entity(self, entity_id: str, position: np.ndarray, speed: float, direction: float, edge: str | None):
+    def update_entity(self, entity_id: str, position: np.ndarray, speed: float, direction: float, roadId: str | None):
         self._entities[entity_id] = Entity(
-            position    = position.astype(float),
-            speed       = speed,
-            direction   = direction,
-            edge        = edge
+            position  = position.astype(float),
+            speed     = speed,
+            direction = direction,
+            roadId    = roadId
         )
 
 
@@ -108,6 +108,14 @@ class SimpleEnvironment(Environment):
 
 
     # physics helpers (delegation) ----------------------------------------------------------
+    def init_position(self):
+        # Initialize agent's position avoiding buildings.
+        while True:
+            position = np.random.rand(2)*self.L   # Initialize (xᵢ, yᵢ) (positions of agent in plan)
+            if self.is_valid_position(position): break
+
+        return position
+
     def is_valid_position(self, position: np.ndarray) -> bool:
         return self.physics.is_valid_position(position)
 

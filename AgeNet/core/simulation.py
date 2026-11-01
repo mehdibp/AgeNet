@@ -54,24 +54,6 @@ class AgentSimulator:
         if self.requesting: self.agent.decide_request()
         if self.training  : self.agent.learn(steps_per_train)
 
-    # ----------------------------------------------------------------------------------
-    def manualEnvChange(self, environment: Environment):
-        if self.moving: position, speed, radian = self.agent.move()
-        else: position, speed, radian = self.agent.position, self.agent.speed, self.agent.radian
-        environment.update_entity(self.agent.id, position, speed, radian, edge=None)
-
-        self.agent.update_physical_state(position, speed, radian, edge=None)
-
-    # ----------------------------------------------------------------------------------
-    def sumoEnvChange(self, environment: Environment):
-        position  = environment.get_position (self.agent.id)
-        speed     = environment.get_speed    (self.agent.id)
-        direction = environment.get_direction(self.agent.id)
-        edge      = environment.get_edge     (self.agent.id)
-
-        self.agent.update_physical_state(position, speed, direction, edge)
-
-
 
 
 class AgentsSimulator(AgentSimulator):
@@ -81,36 +63,28 @@ class AgentsSimulator(AgentSimulator):
         self.environment = environment
 
         for agent in agents: 
-            agent_simulator = AgentSimulator(agent, Functions, environment._build_bounds)
-            self.agents_simulator.append(agent_simulator)
+            self.add_agent(agent, Functions)
 
 
     # ----------------------------------------------------------------------------------
     def run(self, agents: List[Agent], steps_per_train: int=10):
-        # A fixed sweep order gives every early-index agent systematically "staler" info
-        # about later agents than vice versa. Shuffling removes that index-dependent bias
-        # while keeping the update fully local/async -- no shared state or global view is
-        # introduced, this only changes WHEN each agent's own local turn happens.
+        self.environment.step()
+        
         order = list(self.agents_simulator)
         np.random.shuffle(order)
  
         for simulator in order:
-            self._EnvChange(simulator)
+            position, speed, direction, roadId = self.environment.get_entity(simulator.agent.id)
+            simulator.agent.update_physical_state(position, speed, direction, roadId)
             simulator.step(agents, steps_per_train)
 
     # ----------------------------------------------------------------------------------
     def add_agent(self, agent: Agent, Functions: List[bool] = [True, True, True]):
         agent_simulator = AgentSimulator(agent, Functions, self.environment._build_bounds)
-        self._EnvChange(agent_simulator)
         self.agents_simulator.append(agent_simulator)
 
     # ----------------------------------------------------------------------------------
     def remove_agent(self, agent: Agent):
         self.agents_simulator = [ sim for sim in self.agents_simulator if sim.agent is not agent ]
 
-    # ----------------------------------------------------------------------------------
-    def _EnvChange(self, simulator: AgentSimulator):
-        if   isinstance(self.environment, SimpleEnvironment): simulator.manualEnvChange(self.environment)
-        elif isinstance(self.environment, SumoEnvironment  ): simulator.sumoEnvChange  (self.environment)
-        else: raise ValueError( "This environment does not exist (use simple or sumo)" )
 

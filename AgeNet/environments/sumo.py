@@ -97,10 +97,10 @@ class SumoEnvironment(Environment):
 
         self._entities.clear()
         for vid in vehicle_ids:
-            pos   = traci.vehicle.getPosition(vid)
-            speed = traci.vehicle.getSpeed   (vid)
-            edge  = traci.vehicle.getRoadID  (vid)
-            self._entities[vid] = Entity(np.array(pos, dtype=np.float32), speed, None, edge)
+            pos    = traci.vehicle.getPosition(vid)
+            speed  = traci.vehicle.getSpeed   (vid)
+            roadId = traci.vehicle.getRoadID  (vid)
+            self._entities[vid] = Entity(np.array(pos, dtype=np.float32), speed, None, roadId)
 
     def _load_network_bounds(self):
         """Extract bounding box of SUMO road network."""

@@ -61,7 +61,7 @@ class BaseEnvironment(ABC):
         pass
 
     @abstractmethod
-    def get_edge(self, entity_id: str) -> str | None:
+    def get_roadId(self, entity_id: str) -> str | None:
         """Return steet or lane it is located on."""
         pass
     
@@ -85,7 +85,7 @@ class Entity:
     position  : np.ndarray
     speed     : float
     direction : float | None
-    edge      : str   | None
+    roadId    : str   | None
 
 
 # -------------------------------------------------------------------------------------------
@@ -98,8 +98,14 @@ class Environment(BaseEnvironment, ABC):
         self._build_bounds = []
         self._time: float = 0.0
 
+    # lifecycle -----------------------------------------------------------------------------
+    def start(self): self._time = 0.0
+    def close(self): self._entities.clear()
+    def reset(self): self.close(); self.start()
+    def step (self): pass
+
     # agent queries - Public API (used by controller / state extractor) ---------------------
-    def get_entity_ids(self)                 -> List[str]   :
+    def get_entity_ids(self) -> List[str]   :
         return list(self._entities.keys())
     def get_position  (self, entity_id: str) -> np.ndarray  : 
         return self._entities[entity_id].position
@@ -107,8 +113,11 @@ class Environment(BaseEnvironment, ABC):
         return self._entities[entity_id].speed
     def get_direction (self, entity_id: str) -> float | None: 
         return self._entities[entity_id].direction
-    def get_edge      (self, entity_id: str) -> str   | None: 
-        return self._entities[entity_id].edge 
-    def get_time      (self)                 -> float       : 
+    def get_roadId    (self, entity_id: str) -> str   | None: 
+        return self._entities[entity_id].roadId 
+    def get_entity    (self, entity_id: str) -> tuple: 
+        e = self._entities[entity_id]
+        return e.position, e.speed, e.direction, e.roadId
+    def get_time      (self) -> float       : 
         return self._time
     

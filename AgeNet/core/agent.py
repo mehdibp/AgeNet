@@ -1,7 +1,6 @@
 import numpy as np
 from typing import List, Tuple
 
-from AgeNet.physics import MobilityModel, PhysicalState
 from AgeNet.communication import RadioModel, ChannelModel, NeighborFinder, RadiusRequestPolicy
 from AgeNet.learning import create_brain, StateExtractor, Hamiltonian, RadiusController
 from .action_policies import BasePolicy, FixedRadiusPolicy, KNNPolicy, MinDegreePolicy
@@ -12,13 +11,10 @@ class Agent:
     def __init__(
         self, 
         agent_id: str, 
+        entity: Tuple,
         alphas: Tuple,
         brain_parameters: List,
         communication_parameters: List[float],
-
-        physical_state: PhysicalState, 
-        mobility: MobilityModel | None = None,
-
         action_policy_parameters: List = ['RL'],
 
         brain_type: str = "dqn",
@@ -27,9 +23,6 @@ class Agent:
         
         self.id = agent_id
         
-        # -------- physical state --------
-        self.physical_state = physical_state
-        self.mobility       = mobility
 
         # -------- communication --------
         absorption, base_delay, max_delay = communication_parameters
@@ -47,10 +40,7 @@ class Agent:
         self.action_policy = self._build_policy(action_policy_parameters)
 
         # -------- bookkeeping --------
-        self.position = self.physical_state.get_position()
-        self.speed    = self.physical_state.get_speed()
-        self.radian   = self.physical_state.get_direction()
-        self.edge     = self.physical_state.get_edge()
+        self.position, self.speed, self.direction, self.roadId = entity
 
         self.neighbors          = []
         self.incoming_neighbors = []
@@ -65,20 +55,8 @@ class Agent:
     # High-level API
     # ==================================================================================
 
-    def move(self):
-        if self.mobility is None: 
-            raise ValueError( "Mobility/Movement is not defined. (Maybe using the sumo environment)" )
-
-        position, speed, radian = self.mobility.move(self.position)
-        return position, speed, radian
-
-    def update_physical_state(self, position, speed, radian, edge):
-        self.position, self.speed, self.radian, self.edge = position, speed, radian, edge
-
-        self.physical_state.set_position (position)
-        self.physical_state.set_direction(radian)
-        self.physical_state.set_speed(speed)
-        self.physical_state.set_edge (edge)
+    def update_physical_state(self, position, speed, direction, roadId):
+        self.position, self.speed, self.direction, self.roadId = position, speed, direction, roadId
 
     def update_neighbors(self, all_agents: List["Agent"]):
         self.incoming_neighbors, self.neighbors = self.neighbor_finder.neighbors(all_agents)
