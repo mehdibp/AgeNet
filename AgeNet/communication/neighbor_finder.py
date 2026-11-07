@@ -1,8 +1,21 @@
 import numpy as np
 from typing import Tuple, List
+from dataclasses import dataclass
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING: from AgeNet.core import Agent
+
+
+@dataclass
+class RemoteNeighbor:
+    """ A neighbor known only from an external simulator's table (OMNeT++). """
+    id: str
+    position: np.ndarray
+    speed: float
+    roadId: str
+    distance: float
+    last_seen: float
+    r: float = float("nan")
 
 
 # Pure geometric neighbor discovery.

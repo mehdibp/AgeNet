@@ -1,13 +1,6 @@
-import json
-import socketserver
-import threading
+import json, socketserver
 
-
-HOST = "0.0.0.0"
-PORT = 5555
-
-# In the future, shared AgeNet state can be protected by this lock.
-agent_lock = threading.Lock()
+HOST, PORT = "0.0.0.0", 5555
 
 
 class AgeNetHandler(socketserver.StreamRequestHandler):
@@ -20,60 +13,65 @@ class AgeNetHandler(socketserver.StreamRequestHandler):
                 if not line: break
 
                 try:
-                    observation = json.loads(line.decode("utf-8"))
-                    if observation.get("type") != "observe":
-                        raise ValueError("Expected an observe message")
+                    observation: dict = json.loads(line)
+                    if observation.get("type") != "observe": raise ValueError("Expected an observe message")
 
-                    vehicle_id = observation["vehicle_id"]
-                    with agent_lock:
-                        self.process_observation(observation)
+                    vehicles: dict = observation["vehicles"]        # {vid: {"position","speed","road_id","neighbors"}}
+                    self.print_observation(observation)
 
-                        # Temporary dummy action; no RL yet.
-                        response = { "type": "action", "vehicle_id": vehicle_id, "txPower_mW": 17.5, }
-
-                    encoded = (json.dumps(response, separators=(",", ":")) + "\n").encode("utf-8")
-                    self.wfile.write(encoded)
-                    self.wfile.flush()
-
+                    response = {
+                        "type": "action", "step": observation["step"], "sim_time": observation["sim_time"],
+                        "actions": {vid: {"txPower_mW": 17.5} for vid in vehicles},   # dummy
+                    }
                 except (ValueError, KeyError, TypeError) as exc:
                     print(f"[INVALID MESSAGE] {exc}")
+                    response = {"type": "error", "message": "invalid_message"}
 
-                    response = {"type": "error", "message": "invalid_message",}
-                    self.wfile.write((json.dumps(response) + "\n").encode("utf-8"))
-                    self.wfile.flush()
-
+                self.wfile.write((json.dumps(response, separators=(",", ":")) + "\n").encode())
+                self.wfile.flush()
         finally:
             print(f"[DISCONNECT] {self.client_address}")
+            
 
     @staticmethod
-    def process_observation(obs):
-        vehicle_id = obs["vehicle_id"]
-        sim_time = obs["sim_time"]
-        position = obs["position"]
-        neighbors = obs["neighbors"]
+    def print_observation(observation: dict):
+        sim_time = observation["sim_time"]
 
-        print(
-            f"[OBS] t={sim_time:.1f}s "
-            f"vehicle={vehicle_id} "
-            f"pos=({position['x']:.1f}, {position['y']:.1f}) "
-            f"speed={obs['speed']:.2f} m/s "
-            f"neighbors={len(neighbors)}"
-        )
+        vehicles: dict = observation["vehicles"]
+        vehicle_ids = vehicles.keys()
 
-        for neighbor in neighbors:
+        print(f"[OBS] step={observation['step']} t={sim_time:.1f}s vehicles={len(vehicle_ids)}")
+        for vid in vehicle_ids:
+            vehicle_id  = vid
+            position  = vehicles[vid]["position"]
+            speed     = vehicles[vid]["speed"]
+            road_id   = vehicles[vid]["road_id"]
+            neighbors = vehicles[vid]["neighbors"]
+
             print(
-                f"    -> {neighbor['vehicle_id']}: "
-                f"distance={neighbor['distance']:.1f} m, "
-                f"age={neighbor['age']:.2f} s"
+                f"[OBS] t={sim_time:.1f}s "
+                f"vehicle={vehicle_id} "
+                f"position=({position}) "
+                f"speed={speed:.2f} m/s "
+                f"road_id={road_id} \t"
+                f"neighbors={len(neighbors)}"
             )
 
+            for neighbor in neighbors:
+                print(
+                    f"      -> {neighbor['vehicle_id']}: "
+                    f"position={neighbor['position']} "
+                    f"distance={neighbor['distance']:.1f} m, "
+                    f"age={neighbor['age']:.2f} s"
+                )
 
-class ThreadedTCPServer( socketserver.ThreadingMixIn, socketserver.TCPServer, ):
+
+class Server(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
 
 if __name__ == "__main__":
-    with ThreadedTCPServer((HOST, PORT), AgeNetHandler) as server:
+    with Server((HOST, PORT), AgeNetHandler) as server:
         print(f"AgeNet bridge listening on {HOST}:{PORT}")
         server.serve_forever()

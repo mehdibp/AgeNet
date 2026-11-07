@@ -1,28 +1,32 @@
 #pragma once
 #include "applications/VehicleState.h"
 #include <nlohmann/json.hpp>
+#include <map>
+#include <set>
 #include <string>
 
 namespace veins {
 
 // What Python decided for one vehicle.
 struct AgentAction {
-    std::string vehicleId;
-    double      txPower = 0.0;
+    double txPower = 0.0;   // mW
 };
+using ActionMap = std::map<std::string, AgentAction>;   // vehicle_id -> action
 
 
-// The wire format between AgeNetApp and the Python side lives ONLY here.
-// (PythonBridge = transport, this file = message schema, AgeNetApp = scheduling.)
-// If the JSON fields change on the Python side, this is the single file to edit.
+// The wire format between the Coordinator and Python lives ONLY here.
+// (PythonBridge = transport, this file = schema, AgeNetCoordinator = scheduling.)
 namespace agent_protocol {
 
-    // {"type":"observe", "vehicle_id":..., "sim_time":..., "position":{x,y}, "speed":..., "road_id":..., "neighbors":[...]}
-    nlohmann::json buildObservation(const VehicleState& self, const std::map<int, VehicleState>& neighbors, omnetpp::simtime_t now);
+    // {"position":[x,y], "speed":..., "road_id":..., "neighbors":[...]}
+    nlohmann::json buildVehicleEntry(const VehicleState& self, const std::map<int, VehicleState>& neighbors, omnetpp::simtime_t now);
 
-    // Validates {"type":"action", "vehicle_id":..., "txPower_mW":...}.
-    // Throws std::runtime_error with a readable message on ANY problem.
-    AgentAction parseAction(const nlohmann::json& message, const std::string& expectedVehicleId);
+    // Whole message. `sections` is an object like {"vehicles": {...}, "traffic_lights": {...}};
+    nlohmann::json buildObservation(long step, omnetpp::simtime_t now, const nlohmann::json& sections);
+
+    // Validates {"type":"action","step":..., "actions":{vid:{"txPower_mW":..}}}.
+    ActionMap parseActions(const nlohmann::json& message, long expectedStep, const std::set<std::string>& knownVehicles);
 
 } // namespace agent_protocol
 } // namespace veins
+

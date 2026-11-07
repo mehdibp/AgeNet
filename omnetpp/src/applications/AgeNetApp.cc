@@ -1,8 +1,8 @@
 #include "veins/modules/application/traci/TraCIDemo11pMessage_m.h"
+#include "veins/modules/mac/ieee80211p/Mac1609_4.h"
 
 #include "AgeNetApp.h"
-#include "bridge/AgentProtocol.h"
-#include "bridge/PythonBridge.h"
+#include "coordination/AgeNetCoordinator.h"
 #include "logging/ConsoleLog.h"
 #include "messages/VehicleStatusMessage_m.h"
 
@@ -18,12 +18,7 @@ Define_Module(AgeNetApp);
 
 
 namespace {
-    constexpr double FirstEventDelay  = 2.0;
-    constexpr double ShowStatusPeriod = 1.0;
-    constexpr double SendPeriod       = 1.0;
-    constexpr double NeighborPeriod   = 1.0;
     constexpr double NeighborTimeout  = 3.0;
-    constexpr double PythonPeriod     = 1.0;
 }
 
 
@@ -33,22 +28,30 @@ void AgeNetApp::initialize(int stage) {
 
     if (stage == 0) {
         console_log::setEnabled(par("enableConsoleLog").boolValue());
-        csvLogger.open(findHost()->getFullName());
-        
-        scheduleAt(simTime() + SimTime(FirstEventDelay, SIMTIME_S) + uniform(0, 1), new cMessage("statusTimer"));
-        scheduleAt(simTime() + SimTime(FirstEventDelay, SIMTIME_S) + uniform(0, 1), new cMessage("sendTimer"));
-        scheduleAt(simTime() + SimTime(FirstEventDelay, SIMTIME_S) + uniform(0, 1), new cMessage("neighborTimer"));
 
-        if (par("pythonBridgeEnabled").boolValue()) connectToPython();
+        vehicleId = findHost()->getFullName();
+        csvLogger.open(vehicleId);
+        broadcastTimer = new cMessage("broadcastTimer");
 
+        // The network must contain a submodule called "agenetCoordinator".
+        coordinator = check_and_cast<AgeNetCoordinator*>(getModuleByPath("<root>.agenetCoordinator"));
+        coordinator->registerVehicle(vehicleId, this);
     }
+}
+
+// Veins calls finish() before deleting a vehicle that left SUMO, and at the end of the run --
+void AgeNetApp::finish() {
+    if (coordinator) {
+        coordinator->unregisterVehicle(vehicleId);
+        coordinator = nullptr;
+    }
+    if (csvLogger.isOpen()) csvLogger.Close();
+    DemoBaseApplLayer::finish();
 }
 
 // Finish the application --------------------------------------------------------------------
 AgeNetApp::~AgeNetApp() {
-    pythonBridge.reset();
-    if (csvLogger.isOpen()) csvLogger.Close();
-    DemoBaseApplLayer::finish();
+    cancelAndDelete(broadcastTimer);
 }
 
 
@@ -66,31 +69,28 @@ VehicleState AgeNetApp::getVehicleState() {
     return state;
 }
 
+// Send our vehicle status -------------------------------------------------------------------
+void AgeNetApp::sendBeacon() {
+    const VehicleState state = getVehicleState();
 
-// -------------------------------------------------------------------------------------------
-// Handle self-messages ----------------------------------------------------------------------
-void AgeNetApp::handleSelfMsg(cMessage* msg) {
+    VehicleStatusMessage* message = new VehicleStatusMessage();
+    populateWSM(message);
 
-    if (msg->isName("statusTimer")) {
-        // VehicleState state = getVehicleState();
-        // console_log::transmit(state, "VEHICLE");
-        // scheduleAt(simTime() + SimTime(ShowStatusPeriod, SIMTIME_S), msg);
-    }
-    else if (msg->isName("sendTimer")) {
-        sendVehicleStatus();
-        scheduleAt(simTime() + SimTime(SendPeriod, SIMTIME_S) + uniform(0.01, 0.5), msg);
-    }
-    else if (msg->isName("neighborTimer")) {
-        updateNeighbors();
-        scheduleAt(simTime() + SimTime(NeighborPeriod, SIMTIME_S), msg);
-    }
-    else if (msg->isName("pythonTimer")) {
-        exchangeWithPython();
-        scheduleAt(simTime() + SimTime(PythonPeriod, SIMTIME_S), msg);
-    }
-    else { DemoBaseApplLayer::handleSelfMsg(msg); }
+    message->setSenderId(myId);
+    message->setVehicleId(state.vehicleId.c_str());
+    message->setPosX(state.position.x);
+    message->setPosY(state.position.y);
+    message->setSpeed(state.speed);
+    message->setRoadId(state.roadId.c_str());
+    message->setCreationTime(simTime());
+    message->setSerial(messageCounter++);
 
+    message->setRecipientAddress(LAddress::L2BROADCAST());      // Broadcast
+
+    console_log::transmit(state, message->getSerial());
+    sendDown(message);
 }
+
 
 // Handle received messages ------------------------------------------------------------------
 void AgeNetApp::onWSM(BaseFrame1609_4* wsm) {
@@ -112,43 +112,38 @@ void AgeNetApp::onWSM(BaseFrame1609_4* wsm) {
     console_log::received(findHost()->getFullName(), neighbor.vehicleId, neighbors.size());
 }
 
-// Handle Updating Position ------------------------------------------------------------------
-void AgeNetApp::handlePositionUpdate(cObject* obj) {
-    DemoBaseApplLayer::handlePositionUpdate(obj);
-
-    // VehicleState state = getVehicleState();
-    // console_log::transmit(state, "MOVEMENT");
+// Handle self-messages ----------------------------------------------------------------------
+void AgeNetApp::handleSelfMsg(cMessage* msg) {
+    if (msg == broadcastTimer) sendBeacon();
+    else DemoBaseApplLayer::handleSelfMsg(msg);
 }
 
 
 // -------------------------------------------------------------------------------------------
-// Send our vehicle status -------------------------------------------------------------------
-void AgeNetApp::sendVehicleStatus() {
-    const VehicleState state = getVehicleState();
+// Called by the coordinator (Enter_Method makes cross-module calls legal) -------------------
+void AgeNetApp::scheduleBroadcast(simtime_t delay) {
+    Enter_Method("scheduleBroadcast");
+    cancelEvent(broadcastTimer);
+    scheduleAt(simTime() + delay, broadcastTimer);
+}
 
-    VehicleStatusMessage* message = new VehicleStatusMessage();
-    populateWSM(message);
+void AgeNetApp::applyAction(double newTxPowerMw) {
+    Enter_Method("applyAction");
 
-    message->setSenderId(myId);
-    message->setVehicleId(state.vehicleId.c_str());
-    message->setPosX(state.position.x);
-    message->setPosY(state.position.y);
-    message->setSpeed(state.speed);
-    message->setRoadId(state.roadId.c_str());
-    message->setCreationTime(simTime());
-    message->setSerial(messageCounter++);
+    txPowerMw = newTxPowerMw;
+    // mac->setTxPower(txPowerMw);     // takes effect on the NEXT frame sent
+    check_and_cast<Mac1609_4*>(findHost()->getSubmodule("nic")->getSubmodule("mac1609_4"))->setTxPower(txPowerMw);
 
-    message->setRecipientAddress(LAddress::L2BROADCAST());      // Broadcast
-
-    console_log::transmit(state, message->getSerial());
-    sendDown(message);
+    console_log::pythonAction(getVehicleState(), txPowerMw, neighbors.size());
 }
 
 // Remove neighbors that have timed out ------------------------------------------------------
 void AgeNetApp::updateNeighbors() {
+    Enter_Method("updateNeighbors");
+
     for (auto it=neighbors.begin(); it!=neighbors.end();) {
         if (simTime() - it->second.lastSeen > SimTime(NeighborTimeout, SIMTIME_S)) {
-            console_log::neighborLost(findHost()->getFullName(), it->second);
+            console_log::neighborLost(vehicleId, it->second);
 
             it = neighbors.erase(it);
         }
@@ -162,40 +157,3 @@ void AgeNetApp::updateNeighbors() {
     csvLogger.write(state, neighbors, simTime());
 }
 
-// Python bridge -----------------------------------------------------------------------------
-void AgeNetApp::connectToPython() {
-    const std::string host = par("pythonHost").stdstringValue();
-    const int port         = par("pythonPort").intValue();
-
-    pythonBridge = std::make_unique<PythonBridge>();
-    try { pythonBridge->connectToServer(host, port); }
-    catch (const std::exception& error) {
-        pythonBridge.reset();
-        throw cRuntimeError("Python bridge connection failed for %s: %s", findHost()->getFullName(), error.what());
-    }
-
-    EV_INFO << "[PYTHON] Connected for vehicle " << findHost()->getFullName() << " to " << host << ":" << port << endl;
-    scheduleAt(simTime() + SimTime(FirstEventDelay, SIMTIME_S) + uniform(0, 1), new cMessage("pythonTimer"));
-}
-
-// Exchange the current observation and receive a test action from Python --------------------
-void AgeNetApp::exchangeWithPython() {
-    if (!pythonBridge || !pythonBridge->isConnected()) {
-        throw cRuntimeError("Python bridge is not connected for %s", findHost()->getFullName());
-    }
-
-    const VehicleState state = getVehicleState();
-
-    try {
-        const auto reply  = pythonBridge->exchange(agent_protocol::buildObservation(state, neighbors, simTime()));
-        const auto action = agent_protocol::parseAction(reply, state.vehicleId);
-        
-        console_log::pythonAction(state, action.txPower, neighbors.size());
-
-        // Integration stage only: the action is validated and logged, but the radio
-        // transmit power is intentionally not modified yet.
-    }
-    catch (const std::exception& error) {
-        throw cRuntimeError("Python bridge exchange failed for %s: %s", state.vehicleId.c_str(), error.what());
-    }
-}

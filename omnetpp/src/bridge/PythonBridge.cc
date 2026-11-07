@@ -22,13 +22,11 @@ bool PythonBridge::isConnected() const noexcept {
 }
 
 void PythonBridge::close() noexcept {
-    if (socketFd >= 0) {
-        ::close(socketFd);
-        socketFd = -1;
-    }
+    if (socketFd >= 0) { ::close(socketFd); socketFd = -1; }
+    readBuffer.clear();
 }
 
-void PythonBridge::connectToServer(const std::string& host, int port) {
+void PythonBridge::connectToServer(const std::string& host, int port, double timeoutSeconds) {
     if (isConnected()) return;
 
     if (port < 1 || port > 65535) {
@@ -42,8 +40,8 @@ void PythonBridge::connectToServer(const std::string& host, int port) {
 
     // Avoid waiting forever if the Python process stops responding.
     timeval timeout{};
-    timeout.tv_sec = 3;
-    timeout.tv_usec = 0;
+    timeout.tv_sec  = static_cast<time_t>(timeoutSeconds);
+    timeout.tv_usec = static_cast<suseconds_t>((timeoutSeconds - timeout.tv_sec) * 1e6);
 
     if (::setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0 ||
         ::setsockopt(socketFd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
@@ -104,12 +102,21 @@ void PythonBridge::sendAll(const std::string& data) {
 }
 
 std::string PythonBridge::receiveLine() {
-    std::string line;
-    char character = '\0';
-
     while (true) {
-        const ssize_t count = ::recv(socketFd, &character, 1, 0);
+        const std::size_t newline = readBuffer.find('\n');
+        if (newline != std::string::npos) {
+            std::string line = readBuffer.substr(0, newline);
+            readBuffer.erase(0, newline + 1);
+            return line;
+        }
 
+        if (readBuffer.size() > MAX_LINE_SIZE) {
+            close();
+            throw std::runtime_error("Python response exceeded the maximum line size");
+        }
+
+        char chunk[65536];
+        const ssize_t count = ::recv(socketFd, chunk, sizeof(chunk), 0);
         if (count < 0) {
             const std::string error = std::strerror(errno);
             close();
@@ -119,16 +126,9 @@ std::string PythonBridge::receiveLine() {
             close();
             throw std::runtime_error("Python closed the connection before completing its response");
         }
-        if (character == '\n') {
-            return line;
-        }
-
-        line.push_back(character);
-        if (line.size() > MAX_LINE_SIZE) {
-            close();
-            throw std::runtime_error("Python response exceeded the maximum line size");
-        }
+        readBuffer.append(chunk, static_cast<std::size_t>(count));
     }
 }
+
 
 } // namespace veins

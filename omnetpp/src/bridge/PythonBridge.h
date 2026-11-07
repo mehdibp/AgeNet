@@ -12,7 +12,8 @@ namespace veins {
 class PythonBridge {
     private:
         int socketFd = -1;
-        static constexpr std::size_t MAX_LINE_SIZE = 1024 * 1024;
+        std::string readBuffer;
+        static constexpr std::size_t MAX_LINE_SIZE = 64 * 1024 * 1024;
 
         void sendAll(const std::string& data);
         std::string receiveLine();
@@ -24,7 +25,7 @@ class PythonBridge {
 
         ~PythonBridge();
 
-        void connectToServer(const std::string& host, int port);
+        void connectToServer(const std::string& host, int port, double timeoutSeconds = 3.0);
         nlohmann::json exchange(const nlohmann::json& message);
         void close() noexcept;
         bool isConnected() const noexcept;

@@ -30,7 +30,7 @@ class NonMarkovian(MobilityModel):
         self.radian = np.random.uniform(-np.pi, np.pi)
 
     # ---------------------------------------------------------------------------------------
-    def move(self, position: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def move(self, position: np.ndarray) -> Tuple[np.ndarray, float, np.ndarray]:
         # Simple non-Markovian random motion with reflective boundary
         if np.random.rand() > self.randomness:
             dx = self.speed * np.cos(self.radian)
