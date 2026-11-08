@@ -1,6 +1,7 @@
 from .environments.base     import Environment
 from .environments.simple   import SimpleEnvironment
 from .environments.sumo     import SumoEnvironment
+from .environments.omnetpp  import OmnetEnvironment
 from .environments.geometry import do_intersect
 
 from .environments.physics.mobility import MobilityModel, NonMarkovian
