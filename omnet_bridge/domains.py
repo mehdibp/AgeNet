@@ -24,13 +24,14 @@ class State:
         self.time     : float = 0.0
         self.delta_t  : float = 1.0
         self.bounds   : Tuple[float, float, float, float] | None = None   # (xmin, ymin, xmax, ymax)
+        self.radius_range: Tuple[float, float] | None = None              # (min, max) radius the radio can reach
 
         self.vehicles : Dict[str, Dict[str, Any]] = {}         # vid -> raw entry of the observation
         self.sections : Dict[str, Dict[str, Any]] = {}         # "traffic_lights" -> {id: {...}}
         self.departed : List[str] = []
         self.arrived  : List[str] = []
 
-        self.pending_actions: Dict[str, float] = {}            # vid -> txPower_mW, sent by the next step
+        self.pending_actions: Dict[str, float] = {}            # vid -> radius [m], sent by the next step
 
     def update(self, observation: Dict[str, Any], step: int, sim_time: float):
         previous = set(self.vehicles)
@@ -47,7 +48,7 @@ class State:
 
 # -------------------------------------------------------------------------------------------
 class VehicleDomain:
-    """ Like traci.vehicle (read from the cache) + setTxPower (queued until the next step). """
+    """ Like traci.vehicle (read from the cache) + setRadius (queued until the next step). """
 
     def __init__(self, state: State):
         self._state = state
@@ -80,14 +81,26 @@ class VehicleDomain:
         """
         return self._entry(vehicle_id).get("neighbors", [])
 
-    # writing -------------------------------------------------------------------------------
-    def setTxPower(self, vehicle_id: str, power_mW: float):
-        """ Queue a new transmit power. Unlike traci.vehicle.setX, it is SENT by the next simulationStep(). """
-        self._entry(vehicle_id)
-        if not np.isfinite(power_mW) or power_mW <= 0.0:
-            raise ValueError(f"txPower must be a positive number of mW, got {power_mW}")
+    def getRadius(self, vehicle_id: str) -> float:
+        """ NOT in traci: the transmission radius [m] that is in effect right now (after OMNeT++ clamped it). """
+        return float(self._entry(vehicle_id)["radius_m"])
 
-        self._state.pending_actions[vehicle_id] = float(power_mW)
+    def getTxPower(self, vehicle_id: str) -> float:
+        """ NOT in traci: the radio's transmit power [mW]. Diagnostics only; agents think in radii. """
+        return float(self._entry(vehicle_id)["tx_power_mW"])
+
+    # writing -------------------------------------------------------------------------------
+    def setRadius(self, vehicle_id: str, radius_m: float):
+        """
+        Queue a new transmission radius [m]. Unlike traci.vehicle.setX, it is SENT by the next simulationStep().
+        OMNeT++ converts it to power and clamps it to the radio's limits (see simulation.getRadiusRange());
+        the radius that really took effect is visible in getRadius() after the next step.
+        """
+        self._entry(vehicle_id)
+        if not np.isfinite(radius_m) or radius_m <= 0.0:
+            raise ValueError(f"radius must be a positive number of meters, got {radius_m}")
+
+        self._state.pending_actions[vehicle_id] = float(radius_m)
 
 
 # -------------------------------------------------------------------------------------------
@@ -112,6 +125,11 @@ class SimulationDomain:
         if self._state.bounds is None: raise BridgeError("Bounds are known only after start()")
         xmin, ymin, xmax, ymax = self._state.bounds
         return (xmin, ymin), (xmax, ymax)
+
+    def getRadiusRange(self) -> Tuple[float, float]:
+        """ NOT in traci: (min, max) transmission radius [m] the radio can reach (from its min/max power). """
+        if self._state.radius_range is None: raise BridgeError("Radius range is known only after start()")
+        return self._state.radius_range
 
     def getDepartedIDList(self) -> List[str]:
         """ Vehicles that are new in the last step. """
@@ -148,3 +166,4 @@ class SectionDomain:
 
     def getAll(self) -> Dict[str, Any]:
         return dict(self._section())
+

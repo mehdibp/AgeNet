@@ -5,7 +5,7 @@
 import numpy as np
 from typing import List, Tuple
 
-from ... import omnet_bridge as bridge           # networking lives in VaNet/bridge (the "traci" of OMNeT++)
+import omnet_bridge as bridge           # networking lives in VaNet/bridge (the "traci" of OMNeT++)
 from .base import Environment, Entity
 
 

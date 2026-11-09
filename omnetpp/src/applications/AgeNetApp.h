@@ -41,6 +41,7 @@ class AgeNetApp : public DemoBaseApplLayer {
         // ---- Called by AgeNetCoordinator (this module never talks to Python itself) ----
         VehicleState getVehicleState();                         // current state from Veins/SUMO
         const std::map<int, VehicleState>& getNeighbors() const { return neighbors; }
+        double getTxPowerMw() const { return txPowerMw; }
         void updateNeighbors();                                 // drop timed-out neighbors + log
         void applyAction(double txPowerMw);                     // set radio power
         void scheduleBroadcast(omnetpp::simtime_t delay);       // broadcast my status after `delay`

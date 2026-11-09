@@ -7,7 +7,7 @@ AgeNet.bridge -- the "traci" of OMNeT++.
     while bridge.simulationStep():
         for vid in bridge.vehicle.getIDList():
             x, y = bridge.vehicle.getPosition(vid)
-            bridge.vehicle.setTxPower(vid, 17.5)
+            bridge.vehicle.setRadius(vid, 120.0)
     bridge.close()
 
 Module-level names below belong to ONE default connection (like traci). If you ever need

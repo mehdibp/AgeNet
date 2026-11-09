@@ -33,6 +33,8 @@ void AgeNetApp::initialize(int stage) {
         csvLogger.open(vehicleId);
         broadcastTimer = new cMessage("broadcastTimer");
 
+        txPowerMw = findHost()->getSubmodule("nic")->getSubmodule("mac1609_4")->par("txPower").doubleValueInUnit("mW");
+
         // The network must contain a submodule called "agenetCoordinator".
         coordinator = check_and_cast<AgeNetCoordinator*>(getModuleByPath("<root>.agenetCoordinator"));
         coordinator->registerVehicle(vehicleId, this);

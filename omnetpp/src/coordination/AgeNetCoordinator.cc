@@ -3,6 +3,7 @@
 #include "applications/AgeNetApp.h"
 #include "bridge/AgentProtocol.h"
 #include "bridge/PythonBridge.h"
+#include "radio/TxPowerModel.h"
 
 #include <set>
 #include <stdexcept>
@@ -17,6 +18,19 @@ Define_Module(AgeNetCoordinator);
 void AgeNetCoordinator::initialize() {
     cyclePeriod     = par("cyclePeriod").doubleValue();
     broadcastJitter = par("broadcastJitter").doubleValue();
+
+    // Radio model (must exist BEFORE connectToPython(): the hello message carries its radius range)
+    TxPowerModel::Params radio;
+    radio.carrierFrequencyHz = par("carrierFrequency").doubleValueInUnit("Hz");
+    radio.pathLossAlpha      = par("pathLossAlpha").doubleValue();
+    radio.noiseFloorDbm      = par("noiseFloor").doubleValue();
+    radio.minSinrDb          = par("minSinr").doubleValue();
+    radio.minTxPowerMw       = par("minTxPower").doubleValueInUnit("mW");
+    radio.maxTxPowerMw       = par("maxTxPower").doubleValueInUnit("mW");
+    try { powerModel = std::make_unique<TxPowerModel>(radio); }
+    catch (const std::exception& error) { throw cRuntimeError("Invalid radio parameters: %s", error.what()); }
+
+    EV_INFO << "[RADIO] radius range: " << powerModel->minRadius() << " .. " << powerModel->maxRadius() << " m" << endl;
 
     if (par("pythonBridgeEnabled").boolValue()) connectToPython();
 
@@ -64,7 +78,17 @@ void AgeNetCoordinator::connectToPython() {
     const double timeout   = par("socketTimeout").doubleValue();
 
     pythonBridge = std::make_unique<PythonBridge>();
-    try { pythonBridge->connectToServer(host, port, timeout); }
+    try { 
+        pythonBridge->connectToServer(host, port, timeout);
+
+        cModule* network = getSystemModule();
+        const double playgroundX = network->par("playgroundSizeX").doubleValue();
+        const double playgroundY = network->par("playgroundSizeY").doubleValue();
+ 
+        const auto ack = pythonBridge->exchange(agent_protocol::buildHello(
+            playgroundX, playgroundY, cyclePeriod, powerModel->minRadius(), powerModel->maxRadius()));
+        agent_protocol::checkHelloAck(ack);
+    }
     catch (const std::exception& error) {
         pythonBridge.reset();
         throw cRuntimeError("Python bridge connection failed: %s", error.what());
@@ -88,7 +112,11 @@ void AgeNetCoordinator::runCycle() {
 
     for (auto& [vehicleId, app] : vehicles) {
         app->updateNeighbors();
-        vehicleSection[vehicleId] = agent_protocol::buildVehicleEntry(app->getVehicleState(), app->getNeighbors(), now);
+
+        const double txPower = app->getTxPowerMw();
+        vehicleSection[vehicleId] = agent_protocol::buildVehicleEntry(
+            app->getVehicleState(), app->getNeighbors(), now, txPower, powerModel->txPowerToRadius(txPower));
+ 
         knownVehicles.insert(vehicleId);
     }
     allSections["vehicles"] = std::move(vehicleSection);
@@ -102,7 +130,9 @@ void AgeNetCoordinator::runCycle() {
             const auto actions = agent_protocol::parseActions(reply, step, knownVehicles);
 
             // 3) Apply every decision before anyone transmits.
-            for (const auto& [vehicleId, action] : actions) vehicles.at(vehicleId)->applyAction(action.txPower);
+            for (const auto& [vehicleId, action] : actions) {
+                vehicles.at(vehicleId)->applyAction(powerModel->radiusToTxPowerMw(action.radius));
+            }
         }
         catch (const std::exception& error) {
             throw cRuntimeError("Python bridge exchange failed at step %ld: %s", step, error.what());

@@ -20,7 +20,7 @@ class Bridge:
         while bridge.simulationStep():      # ~ traci.simulationStep(): send queued actions, wait for next data
             for vid in bridge.vehicle.getIDList():
                 bridge.vehicle.getPosition(vid)
-                bridge.vehicle.setTxPower(vid, 17.5)
+                bridge.vehicle.setRadius(vid, 120.0)
         bridge.close()                      # ~ traci.close()
 
     simulationStep() == "send the actions queued for the observation I currently hold, then
@@ -92,13 +92,14 @@ class Bridge:
         if hello is None: raise ProtocolError("OMNeT++ disconnected before sending hello")
 
         try:
-            width, height, cycle_period = parse_hello(hello)
+            width, height, cycle_period, radius_range = parse_hello(hello)
         except ProtocolError as error:
             self._connection.send(error_message(str(error)))    # so the C++ side prints WHY
             raise
 
-        self._state.bounds  = (0.0, 0.0, width, height)
-        self._state.delta_t = cycle_period
+        self._state.bounds       = (0.0, 0.0, width, height)
+        self._state.delta_t      = cycle_period
+        self._state.radius_range = radius_range
         self._connection.send(hello_ack())
 
     def _receive_observation(self) -> bool:

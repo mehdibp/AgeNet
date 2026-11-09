@@ -13,6 +13,7 @@ namespace veins {
 
 class AgeNetApp;
 class PythonBridge;
+class TxPowerModel;
 
 class AgeNetCoordinator : public omnetpp::cSimpleModule {
     private:
@@ -21,6 +22,7 @@ class AgeNetCoordinator : public omnetpp::cSimpleModule {
 
         omnetpp::cMessage* cycleTimer = nullptr;
         std::unique_ptr<PythonBridge> pythonBridge;
+        std::unique_ptr<TxPowerModel> powerModel;
 
         std::map<std::string, AgeNetApp*> vehicles;           // ordered -> deterministic message order
         std::map<std::string, SectionProvider> sections;      // extra (non-vehicle) sections
